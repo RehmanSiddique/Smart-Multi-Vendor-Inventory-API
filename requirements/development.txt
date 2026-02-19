@@ -1,0 +1,16 @@
+-r base.txt  # Include base requirements
+
+# Development tools
+ipython==8.17.2  # Better Python shell
+django-debug-toolbar==4.2.0  # Debugging tool
+
+# Testing
+pytest==7.4.3
+pytest-django==4.7.0
+pytest-cov==4.1.0
+factory-boy==3.3.0  # Test data generation
+faker==20.1.0  # Fake data
+
+# Code quality
+black==23.11.0  # Code formatter
+flake8==6.1.0   # Linter

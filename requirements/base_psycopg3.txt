@@ -1,0 +1,14 @@
+# Core Django
+Django==4.2.7
+djangorestframework==3.14.0
+
+# Database - Using psycopg3 (Python 3.13 compatible)
+psycopg[binary]==3.1.18  # Modern PostgreSQL adapter
+
+# Environment variables
+python-dotenv==1.0.0
+django-environ==0.11.2
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
