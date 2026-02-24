@@ -4,9 +4,13 @@ Development settings for SMVIA project.
 
 from .base import *
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-development-key-change-me'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-development-key-change-me')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True

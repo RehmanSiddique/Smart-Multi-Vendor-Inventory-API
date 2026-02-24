@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     
     # Local apps - we'll create these later
     'apps.accounts',
-    'apps.inventory',
+    'apps.inventory.apps.InventoryConfig',
     'apps.forecast',
     'apps.reports',
 ]
@@ -120,7 +120,15 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour'
+    }
 }
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
