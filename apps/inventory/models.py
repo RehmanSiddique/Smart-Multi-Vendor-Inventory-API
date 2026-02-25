@@ -464,3 +464,541 @@ class InventoryLog(models.Model):
     
     def __str__(self):
         return f"{self.product.name}: {self.change} ({self.reason})"
+    
+    
+class Supplier(TenantAwareModel):
+    """
+    Supplier/Vendor model for tracking product sources.
+    
+    Each supplier provides products and has contact information,
+    payment terms, and lead times.
+    """
+    
+    # Basic Information
+    name = models.CharField(max_length=200, db_index=True)
+    code = models.CharField(
+        max_length=50, 
+        blank=True,
+        help_text="Internal supplier code"
+    )
+    
+    # Contact Information
+    contact_person = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    website = models.URLField(blank=True)
+    
+    # Address
+    address_line1 = models.CharField(max_length=255, blank=True)
+    address_line2 = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    country = models.CharField(max_length=100, blank=True, default='USA')
+    
+    # Business Details
+    tax_id = models.CharField(max_length=50, blank=True)
+    payment_terms = models.CharField(
+        max_length=100, 
+        blank=True,
+        default='Net 30',
+        help_text="e.g., Net 30, Due on receipt"
+    )
+    
+    # Lead time in days
+    lead_time_days = models.IntegerField(
+        default=7,
+        validators=[MinValueValidator(0), MaxValueValidator(365)],
+        help_text="Average days from order to delivery"
+    )
+    
+    # Minimum order value/quantity
+    minimum_order_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)]
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    is_preferred = models.BooleanField(
+        default=False,
+        help_text="Preferred supplier"
+    )
+    
+    # Notes
+    notes = models.TextField(blank=True)
+    
+    class Meta(TenantAwareModel.Meta):
+        db_table = 'inventory_supplier'
+        verbose_name = 'Supplier'
+        verbose_name_plural = 'Suppliers'
+        ordering = ['name']
+        unique_together = ['vendor', 'name']  # Name unique per vendor
+        indexes = [
+            models.Index(fields=['vendor', 'is_active']),
+            models.Index(fields=['vendor', 'is_preferred']),
+        ]
+    
+    def __str__(self):
+        return self.name
+    
+    @property
+    def full_address(self):
+        """Return formatted address."""
+        parts = [
+            self.address_line1,
+            self.address_line2,
+            f"{self.city}, {self.state} {self.postal_code}",
+            self.country
+        ]
+        return ', '.join(filter(None, parts))
+    
+    @property
+    def total_purchase_orders(self):
+        """Get total number of purchase orders."""
+        return self.purchase_orders.count()
+    
+    @property
+    def total_spent(self):
+        """Calculate total amount spent with this supplier."""
+        from django.db.models import Sum
+        total = self.purchase_orders.filter(
+            status='received'
+        ).aggregate(
+            total=Sum('total_amount')
+        )['total']
+        return total or 0
+class PurchaseOrder(TenantAwareModel):
+    """
+    Purchase Order model for restocking inventory.
+    
+    Tracks orders placed with suppliers, including status,
+    expected delivery, and received items.
+    """
+    
+    # Status choices
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('sent', 'Sent to Supplier'),
+        ('confirmed', 'Confirmed by Supplier'),
+        ('shipped', 'Shipped'),
+        ('partial', 'Partially Received'),
+        ('received', 'Fully Received'),
+        ('cancelled', 'Cancelled'),
+        ('on_hold', 'On Hold'),
+    )
+    
+    # Order Information
+    order_number = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Unique purchase order number"
+    )
+    
+    # Relationships
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.PROTECT,  # Can't delete supplier with POs
+        related_name='purchase_orders'
+    )
+    
+    # Order Details
+    order_date = models.DateTimeField(default=timezone.now)
+    expected_date = models.DateTimeField(null=True, blank=True)
+    received_date = models.DateTimeField(null=True, blank=True)
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+        db_index=True
+    )
+    
+    # Financial
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    tax = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    shipping_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    total_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    
+    # Tracking
+    tracking_number = models.CharField(max_length=100, blank=True)
+    carrier = models.CharField(max_length=100, blank=True)
+    
+    # Notes
+    notes = models.TextField(blank=True)
+    internal_notes = models.TextField(blank=True)
+    
+    # Who created/received
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='purchase_orders_created'
+    )
+    received_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='purchase_orders_received'
+    )
+    
+    class Meta(TenantAwareModel.Meta):
+        db_table = 'inventory_purchaseorder'
+        verbose_name = 'Purchase Order'
+        verbose_name_plural = 'Purchase Orders'
+        ordering = ['-order_date']
+        indexes = [
+            models.Index(fields=['vendor', 'order_number']),
+            models.Index(fields=['vendor', 'status']),
+            models.Index(fields=['vendor', 'supplier', 'order_date']),
+        ]
+    
+    def __str__(self):
+        return f"PO-{self.order_number} ({self.get_status_display()})"
+    
+    def save(self, *args, **kwargs):
+        """Generate order number if not provided."""
+        if not self.order_number:
+            # Generate PO number: PO-YYYYMMDD-XXXX
+            import random
+            date_str = timezone.now().strftime('%Y%m%d')
+            random_part = random.randint(1000, 9999)
+            self.order_number = f"PO-{date_str}-{random_part}"
+        super().save(*args, **kwargs)
+    
+    def calculate_totals(self):
+        """Calculate subtotal and total from items."""
+        from django.db.models import Sum
+        from decimal import Decimal
+    
+        # Sum the 'total' field from all items (not 'subtotal')
+        items_total = self.items.aggregate(total=Sum('total'))['total'] or Decimal('0')
+        self.subtotal = items_total
+    
+        # Convert tax and shipping_cost to Decimal if they're strings/floats
+        tax = Decimal(str(self.tax)) if self.tax else Decimal('0')
+        shipping = Decimal(str(self.shipping_cost)) if self.shipping_cost else Decimal('0')
+    
+        self.total_amount = self.subtotal + tax + shipping
+        self.save(update_fields=['subtotal', 'total_amount'])
+    
+    @property
+    def is_fully_received(self):
+        """Check if all items are received."""
+        for item in self.items.all():
+            if item.quantity_received < item.quantity:
+                return False
+        return True
+    
+    def receive_items(self, received_by=None):
+        """Process receiving all items."""
+        for item in self.items.all():
+            item.receive(item.quantity)
+        self.status = 'received'
+        self.received_date = timezone.now()
+        self.received_by = received_by
+        self.save()
+
+
+class PurchaseOrderItem(models.Model):
+    """
+    Line items for purchase orders.
+    
+    Tracks individual products in a purchase order,
+    including quantities and prices.
+    """
+    
+    purchase_order = models.ForeignKey(
+        PurchaseOrder,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='purchase_order_items'
+    )
+    
+    # Quantities
+    quantity = models.IntegerField(validators=[MinValueValidator(1)])
+    quantity_received = models.IntegerField(default=0)
+    
+    # Pricing
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+    total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        editable=False,
+        default=0
+    )
+    
+    class Meta:
+        db_table = 'inventory_purchaseorderitem'
+        unique_together = ['purchase_order', 'product']
+    
+    def save(self, *args, **kwargs):
+        """Calculate total before saving."""
+        from decimal import Decimal
+        
+        # Convert to Decimal for precise calculation
+        quantity = Decimal(str(self.quantity))
+        unit_price = Decimal(str(self.unit_price)) if self.unit_price else Decimal('0')
+        
+        # Calculate total
+        self.total = quantity * unit_price
+        
+        # Save the item
+        super().save(*args, **kwargs)
+        
+        # Update purchase order totals
+        self.purchase_order.calculate_totals()
+    
+    def receive(self, quantity):
+        """
+        Receive items and update inventory.
+        
+        Args:
+            quantity: Number of items received
+        """
+        if quantity > (self.quantity - self.quantity_received):
+            raise ValueError(f"Cannot receive {quantity} items. Only {self.quantity - self.quantity_received} remaining.")
+        
+        self.quantity_received += quantity
+        self.save()
+        
+        # Update inventory
+        inventory, created = Inventory.objects.get_or_create(
+            product=self.product
+        )
+        inventory.adjust_inventory(
+            quantity,
+            'purchase',
+            notes=f"From PO: {self.purchase_order.order_number}",
+            user=None
+        )
+        
+        # Update PO status if needed
+        po = self.purchase_order
+        if po.is_fully_received:
+            po.status = 'received'
+            po.save()
+        elif po.items.filter(quantity_received__gt=0).exists():
+            po.status = 'partial'
+            po.save()
+    
+    def __str__(self):
+        return f"{self.product.name} x{self.quantity}"
+    
+class Sale(TenantAwareModel):
+    """
+    Sale transaction model.
+    
+    Records each sale, updates inventory, and tracks revenue.
+    """
+    
+    # Sale status
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+        ('refunded', 'Refunded'),
+    )
+    
+    # Sale Information
+    sale_number = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Unique sale/invoice number"
+    )
+    sale_date = models.DateTimeField(default=timezone.now)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='completed'
+    )
+    
+    # Customer Information
+    customer_name = models.CharField(max_length=200, blank=True)
+    customer_email = models.EmailField(blank=True)
+    customer_phone = models.CharField(max_length=20, blank=True)
+    
+    # Financial
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    tax = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    shipping = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    discount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    
+    # Payment
+    PAYMENT_METHODS = (
+        ('cash', 'Cash'),
+        ('card', 'Credit/Debit Card'),
+        ('bank', 'Bank Transfer'),
+        ('check', 'Check'),
+        ('other', 'Other'),
+    )
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHODS,
+        default='cash'
+    )
+    payment_reference = models.CharField(max_length=100, blank=True)
+    
+    # Notes
+    notes = models.TextField(blank=True)
+    
+    # Who processed the sale
+    processed_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='sales_processed'
+    )
+    
+    class Meta(TenantAwareModel.Meta):
+        db_table = 'inventory_sale'
+        verbose_name = 'Sale'
+        verbose_name_plural = 'Sales'
+        ordering = ['-sale_date']
+        indexes = [
+            models.Index(fields=['vendor', 'sale_number']),
+            models.Index(fields=['vendor', 'sale_date']),
+            models.Index(fields=['vendor', 'status']),
+            models.Index(fields=['customer_email']),
+        ]
+    
+    def __str__(self):
+        return f"Sale-{self.sale_number} (${self.total})"
+    
+    def save(self, *args, **kwargs):
+        """Generate sale number if not provided."""
+        if not self.sale_number:
+            import random
+            date_str = timezone.now().strftime('%Y%m%d')
+            random_part = random.randint(1000, 9999)
+            self.sale_number = f"SALE-{date_str}-{random_part}"
+        super().save(*args, **kwargs)
+    
+    def calculate_totals(self):
+        """Calculate totals from items."""
+        from decimal import Decimal
+        from django.db.models import Sum
+    
+        items_total = self.items.aggregate(total=Sum('subtotal'))['total'] or Decimal('0')
+        self.subtotal = items_total
+    
+        # Convert all to Decimal
+        tax = Decimal(str(self.tax)) if self.tax else Decimal('0')
+        shipping = Decimal(str(self.shipping)) if self.shipping else Decimal('0')
+        discount = Decimal(str(self.discount)) if self.discount else Decimal('0')
+    
+        self.total = self.subtotal + tax + shipping - discount
+        self.save(update_fields=['subtotal', 'total'])
+
+
+class SaleItem(models.Model):
+    """
+    Line items for sales.
+    
+    Tracks individual products sold in a transaction.
+    """
+    
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='sale_items'
+    )
+    
+    # Quantity and pricing
+    quantity = models.IntegerField(validators=[MinValueValidator(1)])
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+    discount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        editable=False,
+        default=0
+    )
+    
+    class Meta:
+        db_table = 'inventory_saleitem'
+    
+    def save(self, *args, **kwargs):
+        """Calculate subtotal before saving."""
+        self.subtotal = (self.quantity * self.unit_price) - self.discount
+        super().save(*args, **kwargs)
+        
+        # Update sale totals
+        self.sale.calculate_totals()
+        
+        # Update inventory
+        if self.sale.status == 'completed':
+            inventory = self.product.inventory
+            inventory.adjust_inventory(
+                -self.quantity,
+                'sale',
+                notes=f"From sale: {self.sale.sale_number}",
+                user=None
+            )
+    
+    def __str__(self):
+        
+        return f"{self.product.name} x{self.quantity}"
