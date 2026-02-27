@@ -26,6 +26,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Clery and related apps
+    'django_celery_results',
+    'django_celery_beat',
     
     # Third party apps
     'rest_framework',
@@ -142,3 +145,12 @@ MIDDLEWARE = [
     # Our custom middleware - AFTER authentication
     'apps.accounts.middleware.TenantMiddleware',
 ]
+
+# Celery settings
+CELERY_BROKER_URL = 'redis://localhost:6380/0'
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
