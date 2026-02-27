@@ -6,6 +6,8 @@ from .base import *
 import os
 from dotenv import load_dotenv
 
+
+
 # Load environment variables
 load_dotenv()
 
@@ -14,6 +16,15 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-development-key-change-me'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+
+MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+] + MIDDLEWARE
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+    'localhost',
+]
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -27,11 +38,6 @@ DATABASES = {
 
 # Show emails in console instead of sending
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
-# Debug toolbar - commented out until installed
-# INSTALLED_APPS += ['debug_toolbar']
-# MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
-# INTERNAL_IPS = ['127.0.0.1']
 
 # Logging
 LOGGING = {
