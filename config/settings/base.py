@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # CORS headers for handling cross-origin requests
+    'corsheaders',
     
     # Celery and related apps
     'django_celery_results',
@@ -50,16 +52,25 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.accounts.middleware.TenantMiddleware',
 ]
 
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    
+]
+CORS_ALLOW_ALL_ORIGINS = True 
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
@@ -136,6 +147,32 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+# Celery Beat Schedule
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'check-low-stock-daily': {
+        'task': 'apps.inventory.tasks.check_low_stock_alerts',
+        'schedule': crontab(hour=9, minute=0),  # 9 AM daily
+    },
+    'update-customer-metrics-daily': {
+        'task': 'apps.inventory.tasks.update_customer_metrics',
+        'schedule': crontab(hour=1, minute=0),  # 1 AM daily
+    },
+    'generate-daily-reports': {
+        'task': 'apps.inventory.tasks.generate_daily_reports',
+        'schedule': crontab(hour=2, minute=0),  # 2 AM daily
+    },
+    'cleanup-old-audit-logs': {
+        'task': 'apps.inventory.tasks.cleanup_old_audit_logs',
+        'schedule': crontab(hour=3, minute=0, day_of_week=0),  # Sunday 3 AM
+    },
+    'send-scheduled-reports': {
+        'task': 'apps.inventory.tasks.send_scheduled_reports',
+        'schedule': crontab(minute='*/30'),  # Every 30 minutes
+    },
+}
+
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -165,7 +202,10 @@ REST_FRAMEWORK = {
     }
     
     
+    
 }
+
+
 
 # JWT settings
 from datetime import timedelta

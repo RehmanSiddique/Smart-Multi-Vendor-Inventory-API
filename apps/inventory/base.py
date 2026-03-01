@@ -31,6 +31,5 @@ class TenantAwareModel(models.Model):
         super().save(*args, **kwargs)
         
     def delete(self, *args, **kwargs):
-        self.vendor = None
-        self.save()
+        # Skip the save() call and directly delete
         super().delete(*args, **kwargs)

@@ -13,6 +13,9 @@ router.register(r'suppliers', views.SupplierViewSet, basename='supplier')
 router.register(r'purchase-orders', views.PurchaseOrderViewSet, basename='purchaseorder')
 router.register(r'sales', views.SaleViewSet, basename='sale')
 
+
 urlpatterns = [
     path('', include(router.urls)),
+    path('test-vendor/', views.test_vendor),
+    path('extended/', include('apps.inventory.urls_extended')),
 ]

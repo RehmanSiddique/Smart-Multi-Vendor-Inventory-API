@@ -12,6 +12,11 @@ from datetime import timedelta
 from decimal import Decimal
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from apps.accounts.middleware import get_current_vendor
+
 
 from .models import (
     Category, Product, Inventory, InventoryLog,
@@ -26,9 +31,54 @@ from .serializers import (
 from apps.accounts.middleware import get_current_vendor
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def test_vendor(request):
+    user = request.user
+    if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
+        return Response({
+            'vendor': user.vendor.business_name,
+            'id': user.vendor.id,
+            'subdomain': user.vendor.subdomain
+        })
+    return Response({'vendor': None})
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
+            return Product.all_objects.filter(vendor=user.vendor)
+        return Product.objects.none()
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to fix category array issue."""
+        # Fix category field if it's an array
+        if 'category' in request.data and isinstance(request.data['category'], list):
+            data = request.data.copy()
+            if len(data['category']) > 0:
+                data['category'] = data['category'][0]
+            else:
+                data['category'] = None
+            request._full_data = data
+        
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to fix category array issue."""
+        # Fix category field if it's an array
+        if 'category' in request.data and isinstance(request.data['category'], list):
+            data = request.data.copy()
+            if len(data['category']) > 0:
+                data['category'] = data['category'][0]
+            else:
+                data['category'] = None
+            request._full_data = data
+        
+        return super().partial_update(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
@@ -49,6 +99,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except Inventory.DoesNotExist:
             return Response({'error': 'No inventory record'}, status=404)
+    
+
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -59,17 +111,43 @@ class CategoryViewSet(viewsets.ModelViewSet):
     
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes  = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'parent']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
     
     def get_queryset(self):
-        """Filter by current vendor."""
-        vendor = get_current_vendor()
-        if vendor:
-            return Category.objects.filter(vendor=vendor)
+        user = self.request.user
+        if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
+            return Category.all_objects.filter(vendor=user.vendor)
         return Category.objects.none()
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to fix parent array issue."""
+        # Fix parent field if it's an array
+        if 'parent' in request.data and isinstance(request.data['parent'], list):
+            data = request.data.copy()
+            if len(data['parent']) > 0:
+                data['parent'] = data['parent'][0]
+            else:
+                data['parent'] = None
+            request._full_data = data
+        
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to fix parent array issue."""
+        # Fix parent field if it's an array
+        if 'parent' in request.data and isinstance(request.data['parent'], list):
+            data = request.data.copy()
+            if len(data['parent']) > 0:
+                data['parent'] = data['parent'][0]
+            else:
+                data['parent'] = None
+            request._full_data = data
+        
+        return super().partial_update(request, *args, **kwargs)
     
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):
@@ -95,6 +173,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 
+
+
+
 class SupplierViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Supplier model.
@@ -102,6 +183,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
     
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'is_preferred', 'country']
     search_fields = ['name', 'contact_person', 'email']
@@ -109,10 +191,58 @@ class SupplierViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter by current vendor."""
-        vendor = get_current_vendor()
-        if vendor:
-            return Supplier.objects.filter(vendor=vendor)
+        user = self.request.user
+        if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
+            return Supplier.all_objects.filter(vendor=user.vendor)
         return Supplier.objects.none()
+    
+    def create(self, request, *args, **kwargs):
+        """Override create to fix array field issues."""
+        # Fix fields that might come as arrays
+        array_fields = ['website', 'email', 'phone', 'contact_person', 'tax_id', 'payment_terms']
+        data = request.data.copy()
+        
+        for field in array_fields:
+            if field in data and isinstance(data[field], list):
+                if len(data[field]) > 0:
+                    data[field] = data[field][0]
+                else:
+                    data[field] = ''
+        
+        request._full_data = data
+        return super().create(request, *args, **kwargs)
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to fix array field issues."""
+        # Fix fields that might come as arrays
+        array_fields = ['website', 'email', 'phone', 'contact_person', 'tax_id', 'payment_terms']
+        data = request.data.copy()
+        
+        for field in array_fields:
+            if field in data and isinstance(data[field], list):
+                if len(data[field]) > 0:
+                    data[field] = data[field][0]
+                else:
+                    data[field] = ''
+        
+        request._full_data = data
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to fix array field issues."""
+        # Fix fields that might come as arrays
+        array_fields = ['website', 'email', 'phone', 'contact_person', 'tax_id', 'payment_terms']
+        data = request.data.copy()
+        
+        for field in array_fields:
+            if field in data and isinstance(data[field], list):
+                if len(data[field]) > 0:
+                    data[field] = data[field][0]
+                else:
+                    data[field] = ''
+        
+        request._full_data = data
+        return super().partial_update(request, *args, **kwargs)
     
     @action(detail=True, methods=['get'])
     def purchase_orders(self, request, pk=None):
@@ -130,6 +260,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
     
     queryset = PurchaseOrder.objects.all()
     serializer_class = PurchaseOrderSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['supplier', 'status']
     search_fields = ['order_number', 'supplier__name']
@@ -139,7 +270,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         """Filter by current vendor."""
         vendor = get_current_vendor()
         if vendor:
-            return PurchaseOrder.objects.filter(vendor=vendor).select_related('supplier')
+            return PurchaseOrder.all_objects.filter(vendor=vendor).select_related('supplier')
         return PurchaseOrder.objects.none()
     
     @action(detail=True, methods=['post'])
@@ -184,7 +315,7 @@ class SaleViewSet(viewsets.ModelViewSet):
         """Filter by current vendor."""
         vendor = get_current_vendor()
         if vendor:
-            return Sale.objects.filter(vendor=vendor).prefetch_related('items')
+            return Sale.all_objects.filter(vendor=vendor).prefetch_related('items')
         return Sale.objects.none()
     
     def perform_create(self, serializer):

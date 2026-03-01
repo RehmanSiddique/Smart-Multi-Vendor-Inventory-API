@@ -61,6 +61,7 @@ class TenantMiddleware(MiddlewareMixin):
         
         # Also attach to request for views to use
         request.vendor = vendor
+        print(f"[TenantMiddleware] vendor set to {vendor}")
         
         # Store user in thread-local if authenticated
         if hasattr(request, 'user') and request.user.is_authenticated:
@@ -75,31 +76,38 @@ class TenantMiddleware(MiddlewareMixin):
         return response
     
     def get_tenant_from_request(self, request):
-        """
-        Try multiple methods to identify the tenant.
-        
-        Order:
-        1. Subdomain (for web browsers)
-        2. X-Tenant-ID header (for API clients)
-        3. User's associated vendor (for authenticated users)
-        """
-        vendor = None
-        
-        # Method 1: Try subdomain
+    # 1. Try subdomain
         vendor = self.get_tenant_from_subdomain(request)
         if vendor:
+            print(f"[Tenant] from subdomain: {vendor}")
             return vendor
-        
-        # Method 2: Try header
+
+    # 2. Try header
         vendor = self.get_tenant_from_header(request)
         if vendor:
+            print(f"[Tenant] from header: {vendor}")
             return vendor
-        
-        # Method 3: Try from authenticated user
-        vendor = self.get_tenant_from_user(request)
-        if vendor:
-            return vendor
-        
+
+    # 3. Try from authenticated user (with detailed logs)
+        if hasattr(request, 'user'):
+            print(f"[Tenant] request.user exists: {request.user}")
+            if request.user.is_authenticated:
+                print(f"[Tenant] User is authenticated: {request.user.email}")
+                if hasattr(request.user, 'vendor'):
+                    print(f"[Tenant] User has vendor attribute: {request.user.vendor}")
+                    if request.user.vendor:
+                        print(f"[Tenant] from user: {request.user.vendor}")
+                        return request.user.vendor
+                    else:
+                        print("[Tenant] User vendor is None")
+                else:
+                    print("[Tenant] User has no 'vendor' attribute")
+            else:
+                print("[Tenant] User is not authenticated")
+        else:
+            print("[Tenant] request.user does not exist")
+
+        print("[Tenant] No tenant found")
         return None
     
     def get_tenant_from_subdomain(self, request):

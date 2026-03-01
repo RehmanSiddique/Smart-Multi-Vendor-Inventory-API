@@ -12,6 +12,39 @@ from .models import (
 from apps.accounts.middleware import get_current_vendor
 
 
+class CategoryField(serializers.PrimaryKeyRelatedField):
+    """Custom field to handle category properly."""
+    
+    def to_internal_value(self, data):
+        print(f"[CategoryField] Input data: {data} (type: {type(data)})")
+        
+        # Handle array case
+        if isinstance(data, list):
+            if len(data) > 0:
+                data = data[0]
+            else:
+                return None
+            print(f"[CategoryField] Extracted from array: {data}")
+        
+        # Handle dict case
+        if isinstance(data, dict) and 'id' in data:
+            data = data['id']
+            print(f"[CategoryField] Extracted from dict: {data}")
+        
+        # Handle empty string
+        if data == '' or data is None:
+            return None
+        
+        print(f"[CategoryField] Final data to process: {data}")
+        return super().to_internal_value(data)
+    
+    def get_queryset(self):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            return Category.objects.filter(vendor=request.user.vendor)
+        return Category.objects.all()
+
+
 class CategorySerializer(serializers.ModelSerializer):
     """
     Serializer for Category model.
@@ -32,8 +65,11 @@ class CategorySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
     
     def create(self, validated_data):
-        """Auto-assign vendor from context."""
-        validated_data['vendor'] = get_current_vendor()
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['vendor'] = request.user.vendor
+        else:
+            raise serializers.ValidationError("Authentication required")
         return super().create(validated_data)
 
 
@@ -79,12 +115,17 @@ class ProductSerializer(serializers.ModelSerializer):
             'discount_percentage', 'inventory', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
-    
-    def create(self, validated_data):
-        """Auto-assign vendor from context."""
-        validated_data['vendor'] = get_current_vendor()
-        return super().create(validated_data)
+        extra_kwargs = {
+            'category': {'required': False, 'allow_null': True}
+        }
 
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['vendor'] = request.user.vendor
+        else:
+            raise serializers.ValidationError("Authentication required")
+        return super().create(validated_data)
 
 class SupplierSerializer(serializers.ModelSerializer):
     """
@@ -92,17 +133,32 @@ class SupplierSerializer(serializers.ModelSerializer):
     """
     
     full_address = serializers.CharField(read_only=True)
+    total_purchase_orders = serializers.IntegerField(read_only=True)
+    total_spent = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Supplier
-        fields = '__all__'
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'code', 'contact_person', 'email', 'phone', 'website',
+            'address_line1', 'address_line2', 'city', 'state', 
+            'postal_code', 'country', 'tax_id', 'payment_terms', 'lead_time_days',
+            'minimum_order_value', 'is_active', 'is_preferred', 'notes',
+            'full_address', 'total_purchase_orders', 'total_spent',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'full_address', 'total_purchase_orders', 'total_spent']
+        extra_kwargs = {
+            'website': {'required': False, 'allow_blank': True},
+            'email': {'required': False, 'allow_blank': True}
+        }
     
     def create(self, validated_data):
-        """Auto-assign vendor from context."""
-        validated_data['vendor'] = get_current_vendor()
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['vendor'] = request.user.vendor
+        else:
+            raise serializers.ValidationError("Authentication required")
         return super().create(validated_data)
-
 
 class PurchaseOrderItemSerializer(serializers.ModelSerializer):
     """
@@ -119,6 +175,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
             'quantity', 'quantity_received', 'unit_price', 'total'
         ]
         read_only_fields = ['id', 'total']
+        
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -143,8 +200,11 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'order_number', 'subtotal', 'total_amount', 'created_at', 'updated_at']
     
     def create(self, validated_data):
-        """Auto-assign vendor from context."""
-        validated_data['vendor'] = get_current_vendor()
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['vendor'] = request.user.vendor
+        else:
+            raise serializers.ValidationError("Authentication required")
         return super().create(validated_data)
 
 
@@ -187,6 +247,9 @@ class SaleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'sale_number', 'subtotal', 'total', 'created_at', 'updated_at']
     
     def create(self, validated_data):
-        """Auto-assign vendor from context."""
-        validated_data['vendor'] = get_current_vendor()
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['vendor'] = request.user.vendor
+        else:
+            raise serializers.ValidationError("Authentication required")
         return super().create(validated_data)

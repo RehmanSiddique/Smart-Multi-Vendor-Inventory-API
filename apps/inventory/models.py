@@ -488,7 +488,7 @@ class Supplier(TenantAwareModel):
     phone = models.CharField(max_length=20, blank=True)
     website = models.URLField(blank=True)
     
-    # Address
+    # Address (keeping both detailed and simple formats)
     address_line1 = models.CharField(max_length=255, blank=True)
     address_line2 = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100, blank=True)
@@ -536,7 +536,6 @@ class Supplier(TenantAwareModel):
         verbose_name = 'Supplier'
         verbose_name_plural = 'Suppliers'
         ordering = ['name']
-        unique_together = ['vendor', 'name']  # Name unique per vendor
         indexes = [
             models.Index(fields=['vendor', 'is_active']),
             models.Index(fields=['vendor', 'is_preferred']),
