@@ -29,7 +29,7 @@ def check_low_stock(sender, instance, created, **kwargs):
         if admin_emails:
             # In a real app, you'd use Celery for this
             # For now, we'll just print
-            print(f"🔔 LOW STOCK ALERT: {product.name} only has {instance.quantity} units!")
+            print(f"[LOW STOCK] {product.name} only has {instance.quantity} units!")
             
             # You could send email here
             # send_mail(
@@ -47,11 +47,11 @@ def sale_created(sender, instance, created, **kwargs):
     When a new sale is created, log it and maybe send notification.
     """
     if created:
-        print(f"💰 New sale: {instance.sale_number} for ${instance.total}")
+        print(f"[SALE] New sale: {instance.sale_number} for ${instance.total}")
         
         # Check if this is a large sale (e.g., > $1000)
         if instance.total > 1000:
-            print(f"🎉 LARGE SALE ALERT: ${instance.total}!")
+            print(f"[LARGE SALE] ${instance.total}!")
 
 
 @receiver(post_save, sender=PurchaseOrder)
@@ -59,12 +59,11 @@ def purchase_order_status_changed(sender, instance, created, **kwargs):
     """
     Notify when purchase order status changes.
     """
-    if not created and instance.tracker.has_changed('status'):
-        old_status = instance.tracker.previous('status')
-        new_status = instance.status
-        
-        print(f"📦 PO {instance.order_number} changed from {old_status} to {new_status}")
+    if created:
+        print(f"[PO CREATED] New purchase order: {instance.order_number}")
+    else:
+        print(f"[PO UPDATED] Purchase order {instance.order_number} updated - Status: {instance.status}")
         
         # If received, celebrate!
-        if new_status == 'received':
-            print(f"✅ PO {instance.order_number} fully received!")
+        if instance.status == 'received':
+            print(f"[PO RECEIVED] {instance.order_number} fully received!")

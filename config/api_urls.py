@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import (
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
+from apps.accounts.views import register_user
 
 # Swagger documentation setup
 schema_view = get_schema_view(
@@ -35,11 +36,13 @@ urlpatterns = [
             path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
             path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
             path('verify/', TokenVerifyView.as_view(), name='token_verify'),
+            path('register/', register_user, name='register'),
         ])),
         
         # App endpoints - make sure these aren't duplicated elsewhere
         path('accounts/', include('apps.accounts.urls')),
         path('inventory/', include('apps.inventory.urls')),
+        path('reports/', include('apps.reports.urls')),
     ])),
     
     # API Documentation

@@ -410,7 +410,7 @@ class Inventory(models.Model):
         """Trigger a reorder alert (can be connected to notifications)."""
         # This could send email, create notification, etc.
         # We'll implement this later with Celery
-        print(f"⚠️ LOW STOCK ALERT: {self.product.name} - Only {self.available_quantity} left!")
+        print(f"[LOW STOCK ALERT] {self.product.name} - Only {self.available_quantity} left!")
         return True
     
 class InventoryLog(models.Model):
@@ -999,5 +999,4 @@ class SaleItem(models.Model):
             )
     
     def __str__(self):
-        
         return f"{self.product.name} x{self.quantity}"

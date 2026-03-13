@@ -4,9 +4,12 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Virtual environment
 venv/
 env/
 ENV/
+.venv/
 
 # Django
 *.log
@@ -16,14 +19,18 @@ db.sqlite3-journal
 media/
 staticfiles/
 
-# Environment variables
+# Environment variables (NEVER commit these)
 .env
+.env.local
+.env.production
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+.claude/
+.qodo/
 
 # OS
 .DS_Store
@@ -32,3 +39,6 @@ Thumbs.db
 # Project specific
 logs/
 *.db
+
+# Sensitive docs
+docs/accounts_passwords.txt

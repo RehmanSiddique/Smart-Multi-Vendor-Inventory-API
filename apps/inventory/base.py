@@ -24,10 +24,9 @@ class TenantAwareModel(models.Model):
     def save(self, *args, **kwargs):
         if not self.vendor_id:
             vendor = get_current_vendor()
-            if vendor:
-                self.vendor = vendor
-            else:
-                raise ValueError("Cannot save tenant-aware model without vendor")
+            if not vendor:
+                raise ValueError("Cannot save tenant-aware model without vendor. Please assign vendor before saving.")
+            self.vendor = vendor
         super().save(*args, **kwargs)
         
     def delete(self, *args, **kwargs):

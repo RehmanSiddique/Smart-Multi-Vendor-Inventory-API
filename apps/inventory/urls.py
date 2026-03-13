@@ -17,5 +17,6 @@ router.register(r'sales', views.SaleViewSet, basename='sale')
 urlpatterns = [
     path('', include(router.urls)),
     path('test-vendor/', views.test_vendor),
+    path('seed-sample-data/', views.seed_sample_data),
     path('extended/', include('apps.inventory.urls_extended')),
 ]

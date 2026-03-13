@@ -3,7 +3,7 @@ API Views for Account models.
 """
 
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from .models import Vendor, User
 
 # Import serializers
-from .serializers import UserSerializer, UserCreateSerializer, VendorSerializer
+from .serializers import UserSerializer, UserCreateSerializer, VendorSerializer, UserRegistrationSerializer
 
 # Import middleware - safe
 from apps.accounts.middleware import get_current_vendor
@@ -74,3 +74,23 @@ class VendorViewSet(viewsets.ModelViewSet):
             'purchase_orders': vendor.purchase_orders.count(),
         }
         return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def register_user(request):
+    """
+    Public endpoint for user registration.
+    Auto-creates vendor for new users.
+    """
+    serializer = UserRegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        return Response({
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'message': 'Registration successful'
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
