@@ -7,7 +7,7 @@ from rest_framework import serializers
 from .models import (
     Category, Product, Inventory, InventoryLog,
     Supplier, PurchaseOrder, PurchaseOrderItem,
-    Sale, SaleItem
+    Sale, SaleItem, Notification
 )
 
 
@@ -520,3 +520,53 @@ class SaleSerializer(serializers.ModelSerializer):
             sale.calculate_totals()
         
         return sale
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Notification model.
+    """
+    
+    notification_type_display = serializers.CharField(
+        source='get_notification_type_display', read_only=True
+    )
+    priority_display = serializers.CharField(
+        source='get_priority_display', read_only=True
+    )
+    time_ago = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'title', 'message', 'notification_type',
+            'notification_type_display', 'priority', 'priority_display',
+            'is_read', 'read_at', 'action_url', 'icon',
+            'related_object_type', 'related_object_id',
+            'time_ago', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'title', 'message', 'notification_type',
+            'priority', 'action_url', 'icon',
+            'related_object_type', 'related_object_id',
+            'created_at', 'updated_at'
+        ]
+    
+    def get_time_ago(self, obj):
+        """Return human-readable time difference."""
+        from django.utils import timezone
+        now = timezone.now()
+        diff = now - obj.created_at
+        
+        if diff.days > 30:
+            months = diff.days // 30
+            return f"{months} month{'s' if months > 1 else ''} ago"
+        elif diff.days > 0:
+            return f"{diff.days} day{'s' if diff.days > 1 else ''} ago"
+        elif diff.seconds >= 3600:
+            hours = diff.seconds // 3600
+            return f"{hours} hour{'s' if hours > 1 else ''} ago"
+        elif diff.seconds >= 60:
+            mins = diff.seconds // 60
+            return f"{mins} min{'s' if mins > 1 else ''} ago"
+        else:
+            return "Just now"

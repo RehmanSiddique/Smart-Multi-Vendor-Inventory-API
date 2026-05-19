@@ -15,12 +15,12 @@ from decimal import Decimal
 from .models import (
     Category, Product, Inventory, InventoryLog,
     Supplier, PurchaseOrder, PurchaseOrderItem,
-    Sale, SaleItem
+    Sale, SaleItem, Notification
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, InventorySerializer,
     SupplierSerializer, PurchaseOrderSerializer, PurchaseOrderItemSerializer,
-    SaleSerializer, SaleItemSerializer
+    SaleSerializer, SaleItemSerializer, NotificationSerializer
 )
 from apps.accounts.middleware import get_current_vendor
 
@@ -48,7 +48,7 @@ def seed_sample_data(request):
     
     try:
         # Create sample supplier
-        supplier, _ = Supplier.objects.get_or_create(
+        supplier, _ = Supplier.all_objects.get_or_create(
             vendor=vendor,
             name='Tech Supplies Inc',
             defaults={
@@ -66,18 +66,18 @@ def seed_sample_data(request):
             }
         )
         
-        # Create sample products with low stock
+        # Create sample products with enough stock to satisfy the sample sales
         products_data = [
-            {'name': 'Laptop', 'sku': 'LAP-001', 'price': 999.99, 'quantity': 2, 'reorder_level': 5},
-            {'name': 'Mouse', 'sku': 'MOU-001', 'price': 29.99, 'quantity': 3, 'reorder_level': 10},
-            {'name': 'Keyboard', 'sku': 'KEY-001', 'price': 79.99, 'quantity': 1, 'reorder_level': 5},
-            {'name': 'Monitor', 'sku': 'MON-001', 'price': 299.99, 'quantity': 0, 'reorder_level': 3},
-            {'name': 'USB Cable', 'sku': 'USB-001', 'price': 9.99, 'quantity': 4, 'reorder_level': 20},
+            {'name': 'Laptop', 'sku': 'LAP-001', 'price': 999.99, 'quantity': 10, 'reorder_level': 5},
+            {'name': 'Mouse', 'sku': 'MOU-001', 'price': 29.99, 'quantity': 15, 'reorder_level': 10},
+            {'name': 'Keyboard', 'sku': 'KEY-001', 'price': 79.99, 'quantity': 10, 'reorder_level': 5},
+            {'name': 'Monitor', 'sku': 'MON-001', 'price': 299.99, 'quantity': 8, 'reorder_level': 3},
+            {'name': 'USB Cable', 'sku': 'USB-001', 'price': 9.99, 'quantity': 20, 'reorder_level': 20},
         ]
         
         created_products = []
         for prod_data in products_data:
-            product, _ = Product.objects.get_or_create(
+            product, _ = Product.all_objects.get_or_create(
                 vendor=vendor,
                 sku=prod_data['sku'],
                 defaults={
@@ -415,7 +415,9 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         """Receive all items for a purchase order."""
         po = self.get_object()
         for item in po.items.all():
-            item.receive(item.quantity)
+            remaining = item.quantity - item.quantity_received
+            if remaining > 0:
+                item.receive(remaining)
         po.refresh_from_db()
         return Response({'status': 'all items received', 'po': PurchaseOrderSerializer(po).data})
 
@@ -446,7 +448,12 @@ class SaleViewSet(viewsets.ModelViewSet):
             vendor = self.request.user.vendor
         if not vendor:
             raise ValueError("No vendor context available")
-        serializer.save(vendor=vendor, status='completed')
+            
+        try:
+            serializer.save(vendor=vendor, status='completed')
+        except ValueError as e:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': str(e)})
     
     @action(detail=False, methods=['get'])
     def today(self, request):
@@ -481,3 +488,56 @@ class SaleViewSet(viewsets.ModelViewSet):
             'sales': self.get_serializer(sales, many=True).data
         }
         return Response(data)
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Notifications.
+    Full CRUD + mark_read, mark_all_read, unread_count.
+    """
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['notification_type', 'is_read', 'priority']
+    search_fields = ['title', 'message']
+    ordering_fields = ['created_at', 'priority']
+    
+    def get_queryset(self):
+        vendor = get_current_vendor()
+        if not vendor and hasattr(self.request.user, 'vendor'):
+            vendor = self.request.user.vendor
+        if vendor:
+            from django.db.models import Q
+            return Notification.all_objects.filter(
+                vendor=vendor
+            ).filter(
+                Q(user=self.request.user) | Q(user__isnull=True)
+            )
+        return Notification.all_objects.none()
+    
+    @action(detail=True, methods=['patch'])
+    def mark_read(self, request, pk=None):
+        """Mark a single notification as read."""
+        notification = self.get_object()
+        notification.mark_as_read()
+        return Response(NotificationSerializer(notification).data)
+    
+    @action(detail=False, methods=['patch'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read for the current user."""
+        qs = self.get_queryset().filter(is_read=False)
+        count = qs.update(is_read=True, read_at=timezone.now())
+        return Response({'status': 'success', 'marked_count': count})
+    
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get the number of unread notifications."""
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({'unread_count': count})
+    
+    @action(detail=False, methods=['delete'])
+    def clear_all(self, request):
+        """Delete all read notifications."""
+        count, _ = self.get_queryset().filter(is_read=True).delete()
+        return Response({'status': 'success', 'deleted_count': count})

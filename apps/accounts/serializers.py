@@ -92,3 +92,19 @@ class VendorSerializer(serializers.ModelSerializer):
             'is_active', 'created_at', 'user_count', 'product_count'
         ]
         read_only_fields = ['id', 'created_at']
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """
+    Serializer for requesting a password reset code.
+    """
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """
+    Serializer for resetting password with OTP code.
+    """
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True, min_length=8)
