@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     # Local apps
     'apps.accounts',
     'apps.inventory.apps.InventoryConfig',
-    'apps.forecast',
     'apps.reports',
 ]
 
