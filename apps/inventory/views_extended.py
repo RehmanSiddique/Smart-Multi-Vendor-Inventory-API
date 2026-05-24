@@ -32,8 +32,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return Customer.all_objects.filter(vendor=user.vendor)
-        return Customer.all_objects.none()
+            return Customer.objects.filter(vendor=user.vendor)
+        return Customer.objects.none()
     
     @action(detail=True, methods=['get'])
     def purchase_history(self, request, pk=None):
@@ -69,8 +69,8 @@ class WarehouseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return Warehouse.all_objects.filter(vendor=user.vendor)
-        return Warehouse.all_objects.none()
+            return Warehouse.objects.filter(vendor=user.vendor)
+        return Warehouse.objects.none()
     
     @action(detail=True, methods=['get'])
     def inventory(self, request, pk=None):
@@ -88,8 +88,8 @@ class PromotionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return Promotion.all_objects.filter(vendor=user.vendor)
-        return Promotion.all_objects.none()
+            return Promotion.objects.filter(vendor=user.vendor)
+        return Promotion.objects.none()
     
     @action(detail=False, methods=['get'])
     def active(self, request):
@@ -111,8 +111,8 @@ class ReturnViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return Return.all_objects.filter(vendor=user.vendor)
-        return Return.all_objects.none()
+            return Return.objects.filter(vendor=user.vendor)
+        return Return.objects.none()
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
@@ -152,8 +152,8 @@ class WebhookViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return Webhook.all_objects.filter(vendor=user.vendor)
-        return Webhook.all_objects.none()
+            return Webhook.objects.filter(vendor=user.vendor)
+        return Webhook.objects.none()
     
     @action(detail=True, methods=['post'])
     def test(self, request, pk=None):
@@ -175,8 +175,8 @@ class ProductTagViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return ProductTag.all_objects.filter(vendor=user.vendor)
-        return ProductTag.all_objects.none()
+            return ProductTag.objects.filter(vendor=user.vendor)
+        return ProductTag.objects.none()
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -186,8 +186,8 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and hasattr(user, 'vendor') and user.vendor:
-            return AuditLog.all_objects.filter(vendor=user.vendor)
-        return AuditLog.all_objects.none()
+            return AuditLog.objects.filter(vendor=user.vendor)
+        return AuditLog.objects.none()
 
 
 # Analytics endpoints

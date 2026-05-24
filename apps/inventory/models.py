@@ -410,7 +410,7 @@ class Inventory(models.Model):
         """Trigger a reorder alert (can be connected to notifications)."""
         # This could send email, create notification, etc.
         # We'll implement this later with Celery
-        print(f"[LOW STOCK ALERT] {self.product.name} - Only {self.available_quantity} left!")
+        print(f"⚠️ LOW STOCK ALERT: {self.product.name} - Only {self.available_quantity} left!")
         return True
     
 class InventoryLog(models.Model):
@@ -712,9 +712,7 @@ class PurchaseOrder(TenantAwareModel):
     def receive_items(self, received_by=None):
         """Process receiving all items."""
         for item in self.items.all():
-            remaining = item.quantity - item.quantity_received
-            if remaining > 0:
-                item.receive(remaining)
+            item.receive(item.quantity)
         self.status = 'received'
         self.received_date = timezone.now()
         self.received_by = received_by
@@ -1001,94 +999,5 @@ class SaleItem(models.Model):
             )
     
     def __str__(self):
+        
         return f"{self.product.name} x{self.quantity}"
-
-
-class Notification(TenantAwareModel):
-    """
-    Notification model for the enterprise notification system.
-    
-    Supports various notification types triggered by system events
-    such as low stock alerts, new sales, PO updates, and more.
-    Each notification is vendor-scoped and user-targeted.
-    """
-    
-    TYPE_CHOICES = (
-        ('low_stock', 'Low Stock Alert'),
-        ('sale_created', 'New Sale'),
-        ('sale_large', 'Large Sale Alert'),
-        ('po_created', 'Purchase Order Created'),
-        ('po_received', 'Purchase Order Received'),
-        ('po_status', 'Purchase Order Status Update'),
-        ('product_created', 'Product Created'),
-        ('inventory_adjusted', 'Inventory Adjusted'),
-        ('system', 'System Notification'),
-        ('info', 'Information'),
-        ('warning', 'Warning'),
-    )
-    
-    PRIORITY_CHOICES = (
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('critical', 'Critical'),
-    )
-    
-    # Core fields
-    title = models.CharField(max_length=255)
-    message = models.TextField()
-    notification_type = models.CharField(
-        max_length=30,
-        choices=TYPE_CHOICES,
-        default='info',
-        db_index=True
-    )
-    priority = models.CharField(
-        max_length=10,
-        choices=PRIORITY_CHOICES,
-        default='medium'
-    )
-    
-    # Target user (null = broadcast to all vendor users)
-    user = models.ForeignKey(
-        'accounts.User',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='notifications'
-    )
-    
-    # Read status
-    is_read = models.BooleanField(default=False, db_index=True)
-    read_at = models.DateTimeField(null=True, blank=True)
-    
-    # Optional action URL (frontend route to navigate to)
-    action_url = models.CharField(max_length=500, blank=True)
-    
-    # Reference to the related object (generic)
-    related_object_type = models.CharField(max_length=50, blank=True)
-    related_object_id = models.IntegerField(null=True, blank=True)
-    
-    # Icon/emoji for display
-    icon = models.CharField(max_length=10, default='🔔')
-    
-    class Meta(TenantAwareModel.Meta):
-        db_table = 'inventory_notification'
-        verbose_name = 'Notification'
-        verbose_name_plural = 'Notifications'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['vendor', 'user', 'is_read']),
-            models.Index(fields=['vendor', 'notification_type']),
-            models.Index(fields=['created_at']),
-        ]
-    
-    def __str__(self):
-        return f"[{self.get_notification_type_display()}] {self.title}"
-    
-    def mark_as_read(self):
-        """Mark this notification as read."""
-        if not self.is_read:
-            self.is_read = True
-            self.read_at = timezone.now()
-            self.save(update_fields=['is_read', 'read_at'])

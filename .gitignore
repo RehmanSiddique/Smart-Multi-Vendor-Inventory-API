@@ -1,17 +1,19 @@
-# Python
+# ── Python ────────────────────────────────────
 __pycache__/
+**/__pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 *.so
 .Python
 
-# Virtual environment
+# ── Virtual Environment ───────────────────────
 venv/
 env/
 ENV/
 .venv/
 
-# Django
+# ── Django ────────────────────────────────────
 *.log
 local_settings.py
 db.sqlite3
@@ -19,26 +21,57 @@ db.sqlite3-journal
 media/
 staticfiles/
 
-# Environment variables (NEVER commit these)
+# ── Environment Variables ─────────────────────
+# NEVER commit .env — it contains real secrets
 .env
 .env.local
 .env.production
 
-# IDE
+# ── IDE ───────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 .claude/
 .qodo/
+.sixth/
 
-# OS
+# ── OS ────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Project specific
+# ── Loose root-level scripts & dumps ─────────
+test_api.py
+test_api_categories.py
+test_backend.py
+test_inventory.py
+test_phase6.py
+test_product_update.py
+test_system.py
+verify_system.py
+MANUAL_TEST.py
+setup_extended.bat
+
+# ── Redundant docs at root ────────────────────
+API_TESTING_GUIDE.md
+ARCHITECTURE.md
+DOCUMENTATION_INDEX.md
+EXTENDED_FEATURES.md
+FINAL_SUMMARY.md
+FRONTEND_INTEGRATION_GUIDE.md
+FRONTEND_PAGES_API_MAPPING.md
+IMPLEMENTATION_SUMMARY.md
+MIGRATION_FIX.md
+QUICK_START.md
+START_HERE.md
+
+# ── Binary / generated docs ───────────────────
+docs/*.docx
+docs/*.pdf
+
+# ── Misc ──────────────────────────────────────
 logs/
 *.db
 
-# Sensitive docs
+# Sensitive credential files
 docs/accounts_passwords.txt

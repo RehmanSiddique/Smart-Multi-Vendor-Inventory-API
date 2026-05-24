@@ -42,41 +42,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for user registration.
-    Auto-creates vendor for new users.
-    """
-    password = serializers.CharField(write_only=True, min_length=8)
-    
-    class Meta:
-        model = User
-        fields = ['email', 'password', 'first_name', 'last_name', 'phone']
-    
-    def create(self, validated_data):
-        # Extract password
-        password = validated_data.pop('password')
-        
-        # Create vendor first
-        vendor = Vendor.objects.create(
-            business_name=f"{validated_data.get('first_name', '')} {validated_data.get('last_name', '')}".strip() or "New Business",
-            subdomain=validated_data['email'].split('@')[0],
-            tier='basic'
-        )
-        
-        # Create user with vendor
-        user = User.objects.create(
-            vendor=vendor,
-            role='vendor_admin',
-            is_active=True,  # Activate user immediately (skip email verification for now)
-            **validated_data
-        )
-        user.set_password(password)
-        user.save()
-        
-        return user
-
-
 class VendorSerializer(serializers.ModelSerializer):
     """
     Serializer for Vendor/Tenant model.
@@ -92,19 +57,3 @@ class VendorSerializer(serializers.ModelSerializer):
             'is_active', 'created_at', 'user_count', 'product_count'
         ]
         read_only_fields = ['id', 'created_at']
-
-
-class ForgotPasswordSerializer(serializers.Serializer):
-    """
-    Serializer for requesting a password reset code.
-    """
-    email = serializers.EmailField()
-
-
-class ResetPasswordSerializer(serializers.Serializer):
-    """
-    Serializer for resetting password with OTP code.
-    """
-    email = serializers.EmailField()
-    code = serializers.CharField(max_length=6)
-    new_password = serializers.CharField(write_only=True, min_length=8)
